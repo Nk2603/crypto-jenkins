@@ -1,0 +1,48 @@
+pipeline {
+ agent any
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main', poll: false, url: 'https://github.com/Nk2603/crypto-jenkins.git'
+            }
+        }
+
+        stage('Build and Push Images') {
+            steps {
+                script {
+                    sh 'docker build -t nk2603/crypto .'
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub', passwordVariable: 'ay_pass', usernameVariable: 'ay_user')]) {
+                        sh 'docker login -u $ay_user -p $ay_pass'
+                        sh 'docker push nk2603/crypto '
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Services') {
+            steps {
+                script {
+                    sh 'docker rm -f  crypto'
+                    sh 'docker run -d --name crypto -p 2603:80 nk2603/crypto'
+                }
+            }
+        }
+        
+        stage('Post Deployment Testing') {
+            steps {
+                script {
+                    sh 'curl -I http://localhost:2603'
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline executed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Check logs for details.'
+        }
+    }
+}
